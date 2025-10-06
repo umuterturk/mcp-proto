@@ -97,14 +97,22 @@ def test_depth_control(index: ProtoIndex):
 
 def test_performance():
     """Test performance with large proto repo."""
-    print_section("TEST 4: Performance with Real Proto Files")
+    print_section("TEST 4: Performance Test (Optional)")
     
     import time
+    import os
     
-    print("Indexing 2093 proto files...")
+    # Use environment variable if set, otherwise skip this test
+    large_proto_dir = os.environ.get('LARGE_PROTO_DIR')
+    if not large_proto_dir:
+        print("⚠ Skipping performance test (set LARGE_PROTO_DIR env var to enable)")
+        print("  Example: export LARGE_PROTO_DIR=/path/to/large/proto/repo")
+        return None
+    
+    print(f"Indexing proto files from: {large_proto_dir}")
     start = time.time()
     index = ProtoIndex()
-    index.index_directory("/Users/umut.erturk/Code/services-protobuf-resources")
+    index.index_directory(large_proto_dir)
     index_time = time.time() - start
     
     stats = index.get_stats()
@@ -192,9 +200,10 @@ def main():
         test_service_resolution(index)
         test_depth_control(index)
         
-        # Test with real files
+        # Test with real files (if configured)
         real_index = test_performance()
-        compare_approaches(real_index)
+        if real_index:
+            compare_approaches(real_index)
         
         print_section("✅ All Tests Passed!")
         print("The recursive resolution feature is working correctly.")

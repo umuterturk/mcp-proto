@@ -89,7 +89,8 @@ mcp-proto/
 
 ### Installation
 ```bash
-cd /Users/umut.erturk/mycode/mcp-proto
+git clone https://github.com/umuterturk/mcp-proto.git
+cd mcp-proto
 pip install -r requirements.txt
 ```
 
@@ -133,9 +134,9 @@ Add to Claude Desktop or Cursor config:
     "proto-server": {
       "command": "python",
       "args": [
-        "/Users/umut.erturk/mycode/mcp-proto/mcp_proto_server.py",
+        "/absolute/path/to/mcp-proto/mcp_proto_server.py",
         "--root",
-        "/path/to/your/protos"
+        "/absolute/path/to/your/protos"
       ]
     }
   }
