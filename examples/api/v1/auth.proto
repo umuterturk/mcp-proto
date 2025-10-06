@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package api.v1;
+
+// Authentication service for user login and session management
+service AuthService {
+  // Login with email and password
+  rpc Login(LoginRequest) returns (LoginResponse);
+  
+  // Logout and invalidate session
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  
+  // Refresh authentication token
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+  
+  // Verify token validity
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+}
+
+// Login request with credentials
+message LoginRequest {
+  string email = 1;  // User email
+  string password = 2;  // User password
+  bool remember_me = 3;  // Extended session flag
+}
+
+// Login response with tokens
+message LoginResponse {
+  string access_token = 1;  // JWT access token
+  string refresh_token = 2;  // Refresh token
+  int64 expires_at = 3;  // Token expiration timestamp
+  string user_id = 4;  // Authenticated user ID
+}
+
+// Logout request
+message LogoutRequest {
+  string access_token = 1;  // Token to invalidate
+}
+
+// Logout response
+message LogoutResponse {
+  bool success = 1;  // Logout success
+}
+
+// Request to refresh access token
+message RefreshTokenRequest {
+  string refresh_token = 1;  // Refresh token
+}
+
+// Response with new access token
+message RefreshTokenResponse {
+  string access_token = 1;  // New access token
+  int64 expires_at = 2;  // New expiration timestamp
+}
+
+// Request to verify token
+message VerifyTokenRequest {
+  string access_token = 1;  // Token to verify
+}
+
+// Response with token validity
+message VerifyTokenResponse {
+  bool is_valid = 1;  // Token validity
+  string user_id = 2;  // User ID if valid
+  int64 expires_at = 3;  // Expiration timestamp
+}
+

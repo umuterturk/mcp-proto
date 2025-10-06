@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "proto-server": {
+      "command": "python",
+      "args": [
+        "/Users/umut.erturk/mycode/mcp-proto/mcp_proto_server.py",
+        "--root",
+        "/Users/umut.erturk/Code/services-protobuf-resources"
+      ],
+      "description": "Protocol Buffer definition server with recursive type resolution (8-15x efficiency gain)",
+      "capabilities": [
+        "search_proto: Fuzzy search across 12,779 definitions",
+        "get_service_definition: Get service with ALL nested types in one call",
+        "get_message_definition: Get message with ALL nested types in one call"
+      ]
+    }
+  }
+}
+
