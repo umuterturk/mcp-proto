@@ -53,8 +53,9 @@ jobs:
 
       - name: Test executable (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          dist/${{ matrix.artifact_name }} --help
+          .\dist\${{ matrix.artifact_name }} --help
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -66,7 +67,9 @@ jobs:
     name: Create Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout code
@@ -86,9 +89,13 @@ jobs:
             file=$(ls)
             if [[ "$file" == *.exe ]]; then
               # Windows: Create zip with exe and install script
-              cp "$file" mcp-proto-server.exe
+              if [[ "$file" != "mcp-proto-server.exe" ]]; then
+                cp "$file" mcp-proto-server.exe
+              fi
               cp ../../install-windows.bat .
-              zip "../../release/${dir%/}.zip" mcp-proto-server.exe install-windows.bat
+              name="${dir%/}"
+              name="${name%.exe}"
+              zip "../../release/${name}.zip" mcp-proto-server.exe install-windows.bat
             else
               # Unix: Create tar.gz with binary and install script
               chmod +x "$file"
@@ -116,7 +123,7 @@ jobs:
   build-quick-test:
     name: Quick Build Test
     runs-on: ubuntu-latest
-    if: "!startsWith(github.ref, 'refs/tags/')"
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     
     steps:
       - name: Checkout code
