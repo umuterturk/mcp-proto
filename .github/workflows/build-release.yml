@@ -1,0 +1,148 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: mcp-proto-server
+            asset_name: mcp-proto-server-linux-amd64
+          - os: macos-latest
+            artifact_name: mcp-proto-server
+            asset_name: mcp-proto-server-macos-amd64
+          - os: macos-14  # Apple Silicon
+            artifact_name: mcp-proto-server
+            asset_name: mcp-proto-server-macos-arm64
+          - os: windows-latest
+            artifact_name: mcp-proto-server.exe
+            asset_name: mcp-proto-server-windows-amd64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller mcp_proto_server.spec
+
+      - name: Test executable
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x dist/${{ matrix.artifact_name }}
+          ./dist/${{ matrix.artifact_name }} --help
+
+      - name: Test executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dist/${{ matrix.artifact_name }} --help
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.artifact_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cd artifacts
+          for dir in */; do
+            cd "$dir"
+            file=$(ls)
+            if [[ "$file" == *.exe ]]; then
+              # Windows: Create zip with exe and install script
+              cp "$file" mcp-proto-server.exe
+              cp ../../install-windows.bat .
+              zip "../../release/${dir%/}.zip" mcp-proto-server.exe install-windows.bat
+            else
+              # Unix: Create tar.gz with binary and install script
+              chmod +x "$file"
+              if [[ "$dir" == *"macos"* ]]; then
+                cp ../../install-macos.sh install.sh
+              else
+                cp ../../install-linux.sh install.sh
+              fi
+              chmod +x install.sh
+              tar -czf "../../release/${dir%/}.tar.gz" "$file" install.sh
+            fi
+            cd ..
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-quick-test:
+    name: Quick Build Test
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'refs/tags/')"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller mcp_proto_server.spec
+
+      - name: Test executable
+        run: |
+          chmod +x dist/mcp-proto-server
+          ./dist/mcp-proto-server --help
+
+      - name: Test with examples
+        run: |
+          timeout 5 ./dist/mcp-proto-server --root examples/ || true
+
