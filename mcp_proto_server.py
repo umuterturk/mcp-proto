@@ -301,8 +301,9 @@ async def main():
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    # Validate root directory
-    proto_root = Path(args.root).resolve()
+    # Validate root directory (expand env vars and ~ first)
+    expanded_root = os.path.expandvars(os.path.expanduser(args.root))
+    proto_root = Path(expanded_root).resolve()
     if not proto_root.exists():
         logger.error(f"Root directory does not exist: {proto_root}")
         sys.exit(1)
