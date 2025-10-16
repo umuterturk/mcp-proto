@@ -276,10 +276,134 @@ func (pi *ProtoIndex) searchInNames(query string, minScore int) []SearchResult {
 	var results []SearchResult
 	seen := make(map[int]bool)
 
-	// Strategy 1: Exact substring matches (case-insensitive) - highest priority
-	for i, name := range names {
-		nameLower := strings.ToLower(name)
+	// Strategy 0: Multi-word search (highest priority for multi-word queries)
+	// Split query by spaces and check if all words appear in the name
+	queryWords := strings.Fields(queryLower)
+	if len(queryWords) > 1 {
+		for i, name := range names {
+			nameLower := strings.ToLower(name)
+			// Remove spaces from both for comparison
+			nameNoSpaces := strings.ReplaceAll(nameLower, " ", "")
+			queryNoSpaces := strings.ReplaceAll(queryLower, " ", "")
 
+			// Try exact match without spaces first
+			if strings.Contains(nameNoSpaces, queryNoSpaces) {
+				score := 100
+				// Adjust based on position and length
+				if strings.HasSuffix(nameNoSpaces, queryNoSpaces) {
+					score = 100
+				} else if strings.HasPrefix(nameNoSpaces, queryNoSpaces) {
+					score = 99
+				} else {
+					score = 97
+				}
+
+				if score >= minScore {
+					entry := pi.searchEntries[i]
+					result := pi.createSearchResult(entry, score, "name")
+					results = append(results, result)
+					seen[i] = true
+				}
+				continue
+			}
+
+			// Check if all query words appear in order (subsequence)
+			allWordsMatch := true
+			searchFrom := 0
+			matchPositions := make([]int, 0, len(queryWords))
+
+			for _, word := range queryWords {
+				idx := strings.Index(nameNoSpaces[searchFrom:], word)
+				if idx == -1 {
+					allWordsMatch = false
+					break
+				}
+				actualPos := searchFrom + idx
+				matchPositions = append(matchPositions, actualPos)
+				searchFrom = actualPos + len(word)
+			}
+
+			if allWordsMatch {
+				// Calculate score based on match quality
+				score := 95
+
+				// Bonus if words match at camelCase boundaries
+				simpleName := name
+				if lastDot := strings.LastIndex(name, "."); lastDot >= 0 {
+					simpleName = name[lastDot+1:]
+				}
+
+				// Check if words align with camelCase boundaries
+				camelBonus := 0
+				for _, word := range queryWords {
+					if matchesCamelCase(simpleName, word) {
+						camelBonus += 2
+					}
+				}
+				score += camelBonus
+
+				// Adjust for compactness of match (how close are the words?)
+				if len(matchPositions) > 1 {
+					totalGap := matchPositions[len(matchPositions)-1] - matchPositions[0]
+					queryTotalLen := 0
+					for _, word := range queryWords {
+						queryTotalLen += len(word)
+					}
+					compactness := float64(queryTotalLen) / float64(totalGap+queryTotalLen)
+					if compactness > 0.7 {
+						score += 3
+					}
+				}
+
+				if score >= minScore {
+					entry := pi.searchEntries[i]
+					result := pi.createSearchResult(entry, score, "name")
+					results = append(results, result)
+					seen[i] = true
+				}
+			}
+		}
+	}
+
+	// Strategy 1: Exact substring matches (case-insensitive)
+	for i, name := range names {
+		if seen[i] {
+			continue
+		}
+
+		nameLower := strings.ToLower(name)
+		nameNoSpaces := strings.ReplaceAll(nameLower, " ", "")
+		queryNoSpaces := strings.ReplaceAll(queryLower, " ", "")
+
+		// Try without spaces first
+		if idx := strings.Index(nameNoSpaces, queryNoSpaces); idx >= 0 {
+			score := 100
+
+			// Adjust based on position
+			if strings.HasSuffix(nameNoSpaces, queryNoSpaces) {
+				score = 100 // Perfect suffix match (simple name)
+			} else if idx == 0 {
+				score = 98 // Match at beginning
+			} else {
+				score = 95 // Match in middle
+			}
+
+			// Adjust for length ratio
+			lengthRatio := float64(len(name)) / float64(len(query))
+			if lengthRatio > 5.0 {
+				score -= 3 // Penalize very long FQNs
+			}
+
+			if score >= minScore {
+				entry := pi.searchEntries[i]
+				result := pi.createSearchResult(entry, score, "name")
+				results = append(results, result)
+				seen[i] = true
+			}
+			continue
+		}
+
+		// Try with spaces
 		if idx := strings.Index(nameLower, queryLower); idx >= 0 {
 			score := 100
 
@@ -311,6 +435,7 @@ func (pi *ProtoIndex) searchInNames(query string, minScore int) []SearchResult {
 
 	// Strategy 2: Levenshtein distance for typo tolerance
 	// Check each name's simple name (last part after final dot) against query
+	queryNoSpaces := strings.ReplaceAll(queryLower, " ", "")
 	for i, name := range names {
 		if seen[i] {
 			continue
@@ -324,12 +449,12 @@ func (pi *ProtoIndex) searchInNames(query string, minScore int) []SearchResult {
 
 		simpleNameLower := strings.ToLower(simpleName)
 
-		// Calculate Levenshtein distance
-		distance := fuzzy.LevenshteinDistance(queryLower, simpleNameLower)
+		// Calculate Levenshtein distance (try both with and without spaces)
+		distance := fuzzy.LevenshteinDistance(queryNoSpaces, simpleNameLower)
 
 		// Convert distance to score (0-100)
 		// For similar lengths, small distances should score high
-		maxLen := len(queryLower)
+		maxLen := len(queryNoSpaces)
 		if len(simpleNameLower) > maxLen {
 			maxLen = len(simpleNameLower)
 		}
@@ -353,24 +478,49 @@ func (pi *ProtoIndex) searchInNames(query string, minScore int) []SearchResult {
 
 	// Strategy 3: Subsequence matching with sahilm/fuzzy (like VSCode)
 	// This catches cases like "UsrSvc" matching "UserService"
-	matches := sahilfuzzy.Find(query, names)
+	// Try both with spaces and without
+	queryVariants := []string{query}
+	if strings.Contains(query, " ") {
+		queryVariants = append(queryVariants, strings.ReplaceAll(query, " ", ""))
+	}
 
-	for _, match := range matches {
-		if seen[match.Index] {
-			continue
-		}
+	for _, qVariant := range queryVariants {
+		matches := sahilfuzzy.Find(qVariant, names)
 
-		score := calculateSubsequenceScore(match.Score, len(query), len(match.Str))
+		for _, match := range matches {
+			if seen[match.Index] {
+				continue
+			}
 
-		if score >= minScore {
-			entry := pi.searchEntries[match.Index]
-			result := pi.createSearchResult(entry, score, "name")
-			results = append(results, result)
-			seen[match.Index] = true
+			score := calculateSubsequenceScore(match.Score, len(qVariant), len(match.Str))
+
+			if score >= minScore {
+				entry := pi.searchEntries[match.Index]
+				result := pi.createSearchResult(entry, score, "name")
+				results = append(results, result)
+				seen[match.Index] = true
+			}
 		}
 	}
 
 	return results
+}
+
+// matchesCamelCase checks if a word matches a camelCase boundary in a name
+func matchesCamelCase(name, word string) bool {
+	wordLower := strings.ToLower(word)
+
+	// Look for the word at camelCase boundaries (uppercase letters)
+	for i := 0; i < len(name); i++ {
+		// Check if this is a camelCase boundary (uppercase letter or start)
+		if i == 0 || (i > 0 && name[i] >= 'A' && name[i] <= 'Z') {
+			// Check if word matches here
+			if strings.HasPrefix(strings.ToLower(name[i:]), wordLower) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // searchInFields searches for query in message field names
