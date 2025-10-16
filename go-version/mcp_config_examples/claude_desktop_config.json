@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "proto-server": {
+      "command": "/Users/username/.local/bin/mcp-proto-server",
+      "args": [
+        "-root",
+        "/path/to/your/proto/files"
+      ]
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

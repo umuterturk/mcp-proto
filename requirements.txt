@@ -1,6 +1,0 @@
-mcp>=1.0.0
-protobuf>=4.25.0
-rapidfuzz>=3.5.0
-watchdog>=3.0.0
-pyinstaller>=6.0.0
-

@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "proto-server": {
+      "command": "/path/to/mcp-proto-server",
+      "args": [
+        "-root",
+        "/path/to/your/proto/files"
+      ],
+      "env": {}
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+
