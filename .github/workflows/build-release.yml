@@ -96,13 +96,17 @@ jobs:
             else
               # Unix: Create tar.gz with binary and install script
               chmod +x "$file"
+              # Rename binary to expected name
+              if [[ "$file" != "mcp-proto-server" ]]; then
+                cp "$file" mcp-proto-server
+              fi
               if [[ "$dir" == *"macos"* ]]; then
                 cp ../../install-macos.sh install.sh
               else
                 cp ../../install-linux.sh install.sh
               fi
               chmod +x install.sh
-              tar -czf "../../release/${dir%/}.tar.gz" "$file" install.sh
+              tar -czf "../../release/${dir%/}.tar.gz" mcp-proto-server install.sh
             fi
             cd ..
           done
