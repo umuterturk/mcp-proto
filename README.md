@@ -22,7 +22,7 @@ MCP Proto Server makes your Protocol Buffer definitions instantly searchable and
 
 ### Download Latest Release
 
-1. Go to the [Releases page](https://github.com/your-username/mcp-proto/releases)
+1. Go to the [Releases page](https://github.com/umuterturk/mcp-proto/releases/latest)
 2. Download the appropriate package for your system:
    - **Linux**: `mcp-proto-server-linux-amd64.tar.gz`
    - **macOS Intel**: `mcp-proto-server-macos-amd64.tar.gz`
