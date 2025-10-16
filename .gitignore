@@ -16,7 +16,6 @@ build/
 htmlcov/
 
 # PyInstaller build artifacts
-*.spec
 *.toc
 *.pkg
 *.pyz
