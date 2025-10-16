@@ -140,18 +140,53 @@ func (s *MCPServer) handleGetMessage(args map[string]interface{}) (string, error
 	return summary.String() + string(data), nil
 }
 
+// handleFindTypeUsages handles the find_type_usages tool
+func (s *MCPServer) handleFindTypeUsages(args map[string]interface{}) (string, error) {
+	// Extract parameters
+	typeName, ok := args["type_name"].(string)
+	if !ok || typeName == "" {
+		return "", fmt.Errorf("type_name parameter is required")
+	}
 
+	s.logger.Debug("find_type_usages", "type_name", typeName)
 
+	// Find usages
+	usages, err := s.index.FindTypeUsages(typeName)
+	if err != nil {
+		return "", fmt.Errorf("failed to find usages: %w", err)
+	}
 
+	// Format as JSON
+	data, err := json.MarshalIndent(usages, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal usages: %w", err)
+	}
 
+	// Add summary
+	var summary strings.Builder
+	summary.WriteString(fmt.Sprintf("Found %d usage(s) of type '%s':\n\n", len(usages), typeName))
 
+	if len(usages) > 0 {
+		// Group by service
+		serviceMap := make(map[string][]string)
+		for _, usage := range usages {
+			serviceName := usage.ServiceName
+			rpcInfo := fmt.Sprintf("  - RPC: %s (%s)", usage.RPCName, usage.UsageContext)
+			if len(usage.FieldPath) > 0 {
+				rpcInfo += fmt.Sprintf(" → %s", strings.Join(usage.FieldPath, "."))
+			}
+			serviceMap[serviceName] = append(serviceMap[serviceName], rpcInfo)
+		}
 
+		summary.WriteString("Services using this type:\n")
+		for serviceName, rpcs := range serviceMap {
+			summary.WriteString(fmt.Sprintf("- %s:\n", serviceName))
+			for _, rpc := range rpcs {
+				summary.WriteString(rpc + "\n")
+			}
+		}
+		summary.WriteString("\nDetailed Results:\n\n")
+	}
 
-
-
-
-
-
-
-
-
+	return summary.String() + string(data), nil
+}

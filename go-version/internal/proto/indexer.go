@@ -1032,3 +1032,169 @@ func (pi *ProtoIndex) findFileForDefinition(fullName, defType string) string {
 func endsWith(s, suffix string) bool {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
+
+// TypeUsage represents a usage of a type in a service/RPC
+type TypeUsage struct {
+	ServiceName     string   `json:"service_name"`
+	ServiceFullName string   `json:"service_full_name"`
+	ServiceFile     string   `json:"service_file"`
+	RPCName         string   `json:"rpc_name"`
+	UsageContext    string   `json:"usage_context"` // e.g., "Request", "Response"
+	MessageType     string   `json:"message_type"`  // The immediate message containing the type
+	FieldPath       []string `json:"field_path"`    // Path to the field containing the type
+	Depth           int      `json:"depth"`         // How deep the type is nested
+}
+
+// FindTypeUsages finds all services and RPCs that use a given type (directly or transitively)
+func (pi *ProtoIndex) FindTypeUsages(typeName string) ([]TypeUsage, error) {
+	pi.mu.RLock()
+	defer pi.mu.RUnlock()
+
+	// Resolve the type to its full name
+	targetFullName := pi.resolveTypeName(typeName)
+	if targetFullName == "" {
+		return nil, fmt.Errorf("type not found: %s", typeName)
+	}
+
+	var usages []TypeUsage
+
+	// Iterate through all services
+	for _, service := range pi.services {
+		// Check each RPC method
+		for _, rpc := range service.RPCs {
+			// Check request type
+			if requestUsages := pi.findTypeInMessage(rpc.RequestType, targetFullName, service, rpc.Name, "Request"); len(requestUsages) > 0 {
+				usages = append(usages, requestUsages...)
+			}
+
+			// Check response type
+			if responseUsages := pi.findTypeInMessage(rpc.ResponseType, targetFullName, service, rpc.Name, "Response"); len(responseUsages) > 0 {
+				usages = append(usages, responseUsages...)
+			}
+		}
+	}
+
+	return usages, nil
+}
+
+// resolveTypeName resolves a simple or fully qualified type name to its full name
+func (pi *ProtoIndex) resolveTypeName(typeName string) string {
+	// Try exact match in messages
+	if _, exists := pi.messages[typeName]; exists {
+		return typeName
+	}
+
+	// Try exact match in enums
+	if _, exists := pi.enums[typeName]; exists {
+		return typeName
+	}
+
+	// Try fuzzy match in messages
+	for fullName, msg := range pi.messages {
+		if endsWith(fullName, "."+typeName) || msg.Name == typeName {
+			return fullName
+		}
+	}
+
+	// Try fuzzy match in enums
+	for fullName, enum := range pi.enums {
+		if endsWith(fullName, "."+typeName) || enum.Name == typeName {
+			return fullName
+		}
+	}
+
+	return ""
+}
+
+// findTypeInMessage recursively searches for a target type within a message
+func (pi *ProtoIndex) findTypeInMessage(messageTypeName, targetFullName string, service *ProtoService, rpcName, context string) []TypeUsage {
+	var usages []TypeUsage
+
+	// Resolve the message type
+	resolvedMessageName := pi.resolveTypeName(messageTypeName)
+	if resolvedMessageName == "" {
+		return usages
+	}
+
+	// Track visited types to avoid infinite recursion
+	visited := make(map[string]bool)
+	pi.findTypeInMessageRecursive(resolvedMessageName, targetFullName, service, rpcName, context, []string{}, 0, visited, &usages)
+
+	return usages
+}
+
+// findTypeInMessageRecursive is the recursive helper for finding type usages
+func (pi *ProtoIndex) findTypeInMessageRecursive(messageFullName, targetFullName string, service *ProtoService, rpcName, context string, fieldPath []string, depth int, visited map[string]bool, usages *[]TypeUsage) {
+	// Prevent infinite recursion
+	if visited[messageFullName] {
+		return
+	}
+	visited[messageFullName] = true
+
+	// Check if this message itself is the target type
+	if messageFullName == targetFullName {
+		serviceFile := pi.findFileForDefinition(service.FullName, "service")
+		*usages = append(*usages, TypeUsage{
+			ServiceName:     service.Name,
+			ServiceFullName: service.FullName,
+			ServiceFile:     serviceFile,
+			RPCName:         rpcName,
+			UsageContext:    context,
+			MessageType:     messageFullName,
+			FieldPath:       append([]string{}, fieldPath...), // Copy slice
+			Depth:           depth,
+		})
+		return
+	}
+
+	// Get the message definition
+	message, exists := pi.messages[messageFullName]
+	if !exists {
+		return
+	}
+
+	// Check each field in the message
+	for _, field := range message.Fields {
+		fieldType := field.Type
+
+		// Skip primitive types
+		if isPrimitiveType(fieldType) {
+			continue
+		}
+
+		// Resolve the field type (try both message and enum)
+		resolvedFieldType := ""
+		if msg := pi.findMessageByType(fieldType, messageFullName); msg != nil {
+			resolvedFieldType = msg.FullName
+		} else if enum := pi.findEnumByType(fieldType, messageFullName); enum != nil {
+			resolvedFieldType = enum.FullName
+		}
+
+		// If we couldn't resolve the type, skip it
+		if resolvedFieldType == "" {
+			continue
+		}
+
+		// Check if the field type is the target
+		if resolvedFieldType == targetFullName {
+			serviceFile := pi.findFileForDefinition(service.FullName, "service")
+			newFieldPath := append(append([]string{}, fieldPath...), field.Name)
+			*usages = append(*usages, TypeUsage{
+				ServiceName:     service.Name,
+				ServiceFullName: service.FullName,
+				ServiceFile:     serviceFile,
+				RPCName:         rpcName,
+				UsageContext:    context,
+				MessageType:     messageFullName,
+				FieldPath:       newFieldPath,
+				Depth:           depth + 1,
+			})
+		} else {
+			// Recursively search in this field's type (only if it's a message, not an enum)
+			if pi.messages[resolvedFieldType] != nil {
+				newFieldPath := append(append([]string{}, fieldPath...), field.Name)
+				pi.findTypeInMessageRecursive(resolvedFieldType, targetFullName, service, rpcName, context, newFieldPath, depth+1, visited, usages)
+			}
+		}
+	}
+}

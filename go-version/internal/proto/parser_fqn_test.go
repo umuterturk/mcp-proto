@@ -7,7 +7,7 @@ import (
 )
 
 // TestParseFullyQualifiedFieldTypes tests that the parser correctly handles
-// fully qualified type names in field definitions (e.g., udemy.dto.Price)
+// fully qualified type names in field definitions (e.g., acme.dto.Price)
 func TestParseFullyQualifiedFieldTypes(t *testing.T) {
 	// Create a temporary proto file with fully qualified types
 	tempDir := t.TempDir()
@@ -18,8 +18,8 @@ func TestParseFullyQualifiedFieldTypes(t *testing.T) {
 package test.v1;
 
 message TaxableLine {
-	udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference product_reference = 1;
-	udemy.dto.payments.checkout_orchestrator.v1beta1.Price unit_net_price = 2;
+	acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference product_reference = 1;
+	acme.dto.payments.checkout_orchestrator.v1beta1.Price unit_net_price = 2;
 	int64 quantity = 3;
 }
 
@@ -29,7 +29,7 @@ message SimpleMessage {
 }
 
 service TestService {
-	rpc Calculate(udemy.rpc.payments.v1.CalculateRequest) returns (udemy.rpc.payments.v1.CalculateResponse);
+	rpc Calculate(acme.rpc.payments.v1.CalculateRequest) returns (acme.rpc.payments.v1.CalculateResponse);
 	rpc SimpleCall(SimpleRequest) returns (SimpleResponse);
 }
 `
@@ -66,11 +66,11 @@ service TestService {
 	}{
 		{
 			fieldName: "product_reference",
-			wantType:  "udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference",
+			wantType:  "acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference",
 		},
 		{
 			fieldName: "unit_net_price",
-			wantType:  "udemy.dto.payments.checkout_orchestrator.v1beta1.Price",
+			wantType:  "acme.dto.payments.checkout_orchestrator.v1beta1.Price",
 		},
 		{
 			fieldName: "quantity",
@@ -135,8 +135,8 @@ service TestService {
 	}{
 		{
 			rpcName:      "Calculate",
-			wantRequest:  "udemy.rpc.payments.v1.CalculateRequest",
-			wantResponse: "udemy.rpc.payments.v1.CalculateResponse",
+			wantRequest:  "acme.rpc.payments.v1.CalculateRequest",
+			wantResponse: "acme.rpc.payments.v1.CalculateResponse",
 		},
 		{
 			rpcName:      "SimpleCall",

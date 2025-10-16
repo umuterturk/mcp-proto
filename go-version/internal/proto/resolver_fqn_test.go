@@ -16,7 +16,7 @@ func TestResolveFullyQualifiedTypes(t *testing.T) {
 	// This simulates the real issue where there are multiple Price messages
 	priceV1 := &ProtoMessage{
 		Name:     "Price",
-		FullName: "udemy.dto.payments.checkout_orchestrator.v1beta1.Price",
+		FullName: "acme.dto.payments.checkout_orchestrator.v1beta1.Price",
 		Fields: []ProtoField{
 			{Name: "amount", Type: "string", Number: 1},
 			{Name: "currency_code", Type: "string", Number: 2},
@@ -36,7 +36,7 @@ func TestResolveFullyQualifiedTypes(t *testing.T) {
 
 	productRef := &ProtoMessage{
 		Name:     "ProductReference",
-		FullName: "udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference",
+		FullName: "acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference",
 		Fields: []ProtoField{
 			{Name: "product_id", Type: "int64", Number: 1},
 			{Name: "product_type", Type: "string", Number: 2},
@@ -46,19 +46,19 @@ func TestResolveFullyQualifiedTypes(t *testing.T) {
 	// TaxableLine uses the fully qualified type name
 	taxableLine := &ProtoMessage{
 		Name:     "TaxableLine",
-		FullName: "udemy.rpc.payments.checkout_orchestrator.info.v1beta1.TaxableLine",
+		FullName: "acme.rpc.payments.checkout_orchestrator.info.v1beta1.TaxableLine",
 		Fields: []ProtoField{
-			{Name: "product_reference", Type: "udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference", Number: 1},
-			{Name: "unit_net_price", Type: "udemy.dto.payments.checkout_orchestrator.v1beta1.Price", Number: 2},
+			{Name: "product_reference", Type: "acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference", Number: 1},
+			{Name: "unit_net_price", Type: "acme.dto.payments.checkout_orchestrator.v1beta1.Price", Number: 2},
 			{Name: "quantity", Type: "int64", Number: 3},
 		},
 	}
 
 	// Index all messages
-	index.messages["udemy.dto.payments.checkout_orchestrator.v1beta1.Price"] = priceV1
+	index.messages["acme.dto.payments.checkout_orchestrator.v1beta1.Price"] = priceV1
 	index.messages["com.payments.common.Price"] = priceV2
-	index.messages["udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference"] = productRef
-	index.messages["udemy.rpc.payments.checkout_orchestrator.info.v1beta1.TaxableLine"] = taxableLine
+	index.messages["acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference"] = productRef
+	index.messages["acme.rpc.payments.checkout_orchestrator.info.v1beta1.TaxableLine"] = taxableLine
 
 	// Resolve types for TaxableLine
 	resolved := index.resolveMessageTypes(taxableLine, 10, nil)
@@ -72,13 +72,13 @@ func TestResolveFullyQualifiedTypes(t *testing.T) {
 	}
 
 	// Check ProductReference is resolved
-	productRefKey := "udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference"
+	productRefKey := "acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference"
 	if _, ok := resolved[productRefKey]; !ok {
 		t.Errorf("resolveMessageTypes() did not resolve %s", productRefKey)
 	}
 
 	// Check the correct Price is resolved (v1beta1, not common)
-	priceKey := "udemy.dto.payments.checkout_orchestrator.v1beta1.Price"
+	priceKey := "acme.dto.payments.checkout_orchestrator.v1beta1.Price"
 	priceResolved, ok := resolved[priceKey]
 	if !ok {
 		t.Errorf("resolveMessageTypes() did not resolve %s", priceKey)
@@ -95,8 +95,8 @@ func TestResolveFullyQualifiedTypes(t *testing.T) {
 		t.Fatal("Price is not a map[string]interface{}")
 	}
 
-	if fullName := priceMap["full_name"]; fullName != "udemy.dto.payments.checkout_orchestrator.v1beta1.Price" {
-		t.Errorf("Price full_name = %v, want 'udemy.dto.payments.checkout_orchestrator.v1beta1.Price'", fullName)
+	if fullName := priceMap["full_name"]; fullName != "acme.dto.payments.checkout_orchestrator.v1beta1.Price" {
+		t.Errorf("Price full_name = %v, want 'acme.dto.payments.checkout_orchestrator.v1beta1.Price'", fullName)
 	}
 
 	// Check fields - should have amount (string) and currency_code, NOT iso_currency_code, precision, etc.
@@ -153,7 +153,7 @@ func TestResolveFullyQualifiedTypesWithParser(t *testing.T) {
 	priceProto := filepath.Join(tempDir, "price_v1.proto")
 	priceContent := `syntax = "proto3";
 
-package udemy.dto.payments.checkout_orchestrator.v1beta1;
+package acme.dto.payments.checkout_orchestrator.v1beta1;
 
 message Price {
 	string amount = 1;
@@ -190,11 +190,11 @@ message Price {
 	taxableProto := filepath.Join(tempDir, "taxable.proto")
 	taxableContent := `syntax = "proto3";
 
-package udemy.rpc.payments.checkout_orchestrator.info.v1beta1;
+package acme.rpc.payments.checkout_orchestrator.info.v1beta1;
 
 message TaxableLine {
-	udemy.dto.payments.checkout_orchestrator.v1beta1.ProductReference product_reference = 1;
-	udemy.dto.payments.checkout_orchestrator.v1beta1.Price unit_net_price = 2;
+	acme.dto.payments.checkout_orchestrator.v1beta1.ProductReference product_reference = 1;
+	acme.dto.payments.checkout_orchestrator.v1beta1.Price unit_net_price = 2;
 	int64 quantity = 3;
 }
 `
@@ -225,7 +225,7 @@ message TaxableLine {
 	resolvedMap := resolvedTypes.(map[string]interface{})
 
 	// Check that the correct Price is resolved
-	priceKey := "udemy.dto.payments.checkout_orchestrator.v1beta1.Price"
+	priceKey := "acme.dto.payments.checkout_orchestrator.v1beta1.Price"
 	priceResolved, ok := resolvedMap[priceKey]
 	if !ok {
 		t.Errorf("GetMessage() did not resolve %s", priceKey)
@@ -239,8 +239,8 @@ message TaxableLine {
 	priceMap := priceResolved.(map[string]interface{})
 
 	// Verify it's the correct Price
-	if fullName := priceMap["full_name"]; fullName != "udemy.dto.payments.checkout_orchestrator.v1beta1.Price" {
-		t.Errorf("Price full_name = %v, want 'udemy.dto.payments.checkout_orchestrator.v1beta1.Price'", fullName)
+	if fullName := priceMap["full_name"]; fullName != "acme.dto.payments.checkout_orchestrator.v1beta1.Price" {
+		t.Errorf("Price full_name = %v, want 'acme.dto.payments.checkout_orchestrator.v1beta1.Price'", fullName)
 	}
 
 	fields := priceMap["fields"].([]map[string]interface{})

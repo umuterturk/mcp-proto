@@ -239,6 +239,23 @@ func (s *MCPServer) handleListTools() (interface{}, error) {
 				"required": []string{"name"},
 			},
 		},
+		{
+			"name": "find_type_usages",
+			"description": "Find all services and RPC methods that use a given type (message or enum). " +
+				"Searches recursively through nested types to find deep dependencies. " +
+				"Returns information about which services, RPCs, and field paths use the type. " +
+				"Useful for impact analysis and understanding type dependencies.",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"type_name": map[string]interface{}{
+						"type":        "string",
+						"description": "Proto message or enum name to find usages for (simple like 'User' or fully qualified like 'api.v1.User')",
+					},
+				},
+				"required": []string{"type_name"},
+			},
+		},
 	}
 
 	return map[string]interface{}{
@@ -269,9 +286,11 @@ func (s *MCPServer) handleToolCall(params json.RawMessage) (interface{}, error) 
 		content, err = s.handleGetService(toolCall.Arguments)
 	case "get_message_definition":
 		content, err = s.handleGetMessage(toolCall.Arguments)
+	case "find_type_usages":
+		content, err = s.handleFindTypeUsages(toolCall.Arguments)
 	default:
-		s.logger.Error("unknown tool requested", "tool_name", toolCall.Name, "available_tools", []string{"search_proto", "get_service_definition", "get_message_definition"})
-		return nil, fmt.Errorf("unknown tool: %s (available tools: search_proto, get_service_definition, get_message_definition)", toolCall.Name)
+		s.logger.Error("unknown tool requested", "tool_name", toolCall.Name, "available_tools", []string{"search_proto", "get_service_definition", "get_message_definition", "find_type_usages"})
+		return nil, fmt.Errorf("unknown tool: %s (available tools: search_proto, get_service_definition, get_message_definition, find_type_usages)", toolCall.Name)
 	}
 
 	if err != nil {
