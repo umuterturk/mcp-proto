@@ -15,6 +15,16 @@ build/
 .coverage
 htmlcov/
 
+# PyInstaller build artifacts
+*.spec
+*.toc
+*.pkg
+*.pyz
+*.zip
+warn-*.txt
+xref-*.html
+localpycs/
+
 # Go
 *.exe
 *.exe~
